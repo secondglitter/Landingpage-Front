@@ -10,8 +10,8 @@ interface Props {
 
 const { title, direction, email, phone } = Astro.props;
 
-const apiURL = import.meta.env.VITE_API_URL;
-const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+const apiURL = import.meta.env.API_URL;
+const siteKey = import.meta.env.RECAPTCHA;
 ---
 
 <section
