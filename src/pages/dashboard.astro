@@ -1,0 +1,192 @@
+---
+import "./src/styles/global.css";
+const apiURL = import.meta.env.VITE_API_URL;
+---
+
+<html>
+  <head><title>Dashboard</title></head>
+  <body class="p-6 bg-gray-100 min-h-screen">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Panel de Leads</h1>
+    <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded"
+      >Cerrar sesion</button
+    >
+
+    <div class="mb-6 mt-4 flex items-center space-x-4">
+      <label for="filter" class="text-gray-700 font-medium"
+        >Filtrar por estado:</label
+      >
+      <select id="filter" class="border border-gray-300 rounded-md p-2">
+        <option value="">Todos</option>
+        <option value="nuevo">Nuevo</option>
+        <option value="contactado">Contactado</option>
+        <option value="descartado">Descartado</option>
+      </select>
+    </div>
+
+    <div
+      id="leadsContainer"
+      data-api-url={apiURL}
+      class="bg-white shadow-md rounded-lg overflow-hidden"
+    >
+    </div>
+
+    <div
+      class="mt-4 flex justify-between items-center"
+      id="paginationControls"
+      style="display: none;"
+    >
+      <button
+        id="prevBtn"
+        class="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+        >Anterior</button
+      >
+      <span id="pageInfo" class="text-gray-700 font-medium">Página 1</span>
+      <button
+        id="nextBtn"
+        class="px-4 py-2 bg-gray-300 rounded disabled:opacity-50"
+        >Siguiente</button
+      >
+    </div>
+
+    <script>
+      const container = document.getElementById("leadsContainer");
+      const apiURL = container.dataset.apiUrl;
+      const filter = document.getElementById("filter");
+      const token = localStorage.getItem("token");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const prevBtn = document.getElementById("prevBtn");
+      const nextBtn = document.getElementById("nextBtn");
+      const pageInfo = document.getElementById("pageInfo");
+      const pagination = document.getElementById("paginationControls");
+
+      let currentPage = 1;
+      const limit = 5;
+      let totalPages = 1;
+
+      if (!token) {
+        window.location.replace("/login"); // redirige sin dejar historial
+      }
+
+      logoutBtn.addEventListener("click", () => {
+        localStorage.removeItem("token");
+        window.location.href = "/login";
+      });
+
+      async function fetchLeads(estadoFiltro = "") {
+        try {
+          const res = await fetch(
+            `${apiURL}/leads?page=${currentPage}&limit=${limit}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+
+          if (!res.ok) throw new Error("Error al obtener leads");
+
+          const { leads, totalPages: total, page } = await res.json();
+          totalPages = total;
+          currentPage = page;
+
+          const leadsFiltrados = estadoFiltro
+            ? leads.filter((lead) => lead.estado === estadoFiltro)
+            : leads;
+
+          if (leadsFiltrados.length === 0) {
+            container.innerHTML =
+              "<p class='p-4 text-gray-600'>No hay leads para mostrar.</p>";
+            pagination.style.display = "none";
+            return;
+          }
+
+          pagination.style.display = "flex";
+          pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+          prevBtn.disabled = currentPage === 1;
+          nextBtn.disabled = currentPage === totalPages;
+
+          container.innerHTML = `
+            <table class="w-full border-collapse bg-white">
+              <thead>
+                <tr class="bg-gray-200">
+                  <th class="border border-gray-300 p-3 text-center">Nombre</th>
+                  <th class="border border-gray-300 p-3 text-center">Correo</th>
+                  <th class="border border-gray-300 p-3 text-center">Teléfono</th>
+                  <th class="border border-gray-300 p-3 text-center">Mensaje</th>
+                  <th class="border border-gray-300 p-3 text-center">Estado</th>
+                  <th class="border border-gray-300 p-3 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${leadsFiltrados
+                  .map(
+                    (lead) => `
+                  <tr class="hover:bg-gray-50">
+                    <td class="border border-gray-300 p-3 text-center">${lead.nombre}</td>
+                    <td class="border border-gray-300 p-3 text-center">${lead.correo}</td>
+                    <td class="border border-gray-300 p-3 text-center">${lead.telefono}</td>
+                    <td class="border border-gray-300 p-3 text-center">${lead.mensaje}</td>
+                    <td class="border border-gray-300 p-3 text-center w-32">
+                      <p class="rounded-full text-white px-2 ${lead.estado === "nuevo" ? "bg-amber-500" : lead.estado === "contactado" ? "bg-green-400" : "bg-red-400"}">${lead.estado}</p>
+                    </td>
+                    <td class="border border-gray-300 p-3 flex space-x-2 justify-center">
+                      <button data-id="${lead.id}" data-estado="contactado" class="btnEstado px-3 py-1 bg-blue-500 text-white rounded">Contactado</button>
+                      <button data-id="${lead.id}" data-estado="descartado" class="btnEstado px-3 py-1 bg-red-500 text-white rounded">Descartado</button>
+                    </td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          `;
+
+          document.querySelectorAll(".btnEstado").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = btn.getAttribute("data-id");
+              const nuevoEstado = btn.getAttribute("data-estado");
+
+              try {
+                const res = await fetch(`${apiURL}/leads/${id}`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ estado: nuevoEstado }),
+                });
+
+                if (!res.ok) throw new Error("Error al actualizar estado");
+
+                fetchLeads(filter.value);
+              } catch (err) {
+                alert("Error actualizando estado");
+              }
+            });
+          });
+        } catch (err) {
+          container.innerHTML = `<p class="text-red-500 p-4">Error: ${err.message}</p>`;
+        }
+      }
+
+      filter.addEventListener("change", () => {
+        currentPage = 1;
+        fetchLeads(filter.value);
+      });
+
+      prevBtn.addEventListener("click", () => {
+        if (currentPage > 1) {
+          currentPage--;
+          fetchLeads(filter.value);
+        }
+      });
+
+      nextBtn.addEventListener("click", () => {
+        if (currentPage < totalPages) {
+          currentPage++;
+          fetchLeads(filter.value);
+        }
+      });
+
+      fetchLeads(); // carga inicial
+    </script>
+  </body>
+</html>
