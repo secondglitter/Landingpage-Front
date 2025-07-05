@@ -1,6 +1,6 @@
 ---
 import "../styles/global.css";
-const apiURL = import.meta.env.VITE_API_URL;
+const apiURL = import.meta.env.API_URL;
 ---
 
 <!doctype html>
@@ -28,7 +28,7 @@ const apiURL = import.meta.env.VITE_API_URL;
         Iniciar Sesión
       </h1>
 
-      <form id="loginForm" data-api-url={apiURL} class="space-y-6">
+      <form id="loginForm" data-api-url=`${apiURL}` class="space-y-6">
         <div>
           <label for="email" class="block text-sm font-medium text-gray-700">
             Correo Electrónico
